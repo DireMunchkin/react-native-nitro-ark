@@ -5,6 +5,9 @@
 #include "HybridNitroArkSpec.hpp"
 #include "generated/ark_cxx.h"
 #include "generated/cxx.h"
+#include <cmath>
+#include <cstdint>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -1065,6 +1068,21 @@ public:
         }
 
         return movements;
+      } catch (const rust::Error& e) {
+        throw std::runtime_error(e.what());
+      }
+    });
+  }
+
+  std::shared_ptr<Promise<void>> updateHistoryMetadata(double movementId, const std::string& patchJson) override {
+    return Promise<void>::async([movementId, patchJson]() {
+      if (!std::isfinite(movementId) || std::trunc(movementId) != movementId || movementId < 0 ||
+          movementId > static_cast<double>(std::numeric_limits<uint32_t>::max())) {
+        throw std::invalid_argument("movementId must be a finite unsigned 32-bit integer");
+      }
+
+      try {
+        bark_cxx::update_history_metadata(static_cast<uint32_t>(movementId), patchJson);
       } catch (const rust::Error& e) {
         throw std::runtime_error(e.what());
       }

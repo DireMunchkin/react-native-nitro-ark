@@ -23,7 +23,7 @@ use bark::ark::lightning::{self, Preimage};
 use bark::lightning_invoice::Bolt11Invoice;
 use bark::lnurllib::lightning_address::LightningAddress;
 use bark::lock_manager::memory::MemoryLockManager;
-use bark::movement::Movement;
+use bark::movement::{Movement, MovementId};
 use bark::onchain::OnchainWallet;
 use bark::persist::BarkPersister;
 use bark::persist::models::{PendingBoard, RoundStateId, SettledLightningReceive};
@@ -66,6 +66,25 @@ use std::str::FromStr;
 use anyhow::Context;
 #[cfg(test)]
 mod tests;
+
+pub(crate) const MAX_HISTORY_METADATA_PATCH_BYTES: usize = 16 * 1024;
+
+pub(crate) fn parse_history_metadata_patch(patch_json: &str) -> anyhow::Result<serde_json::Value> {
+    if patch_json.len() > MAX_HISTORY_METADATA_PATCH_BYTES {
+        bail!(
+            "History metadata patch exceeds the {} byte limit",
+            MAX_HISTORY_METADATA_PATCH_BYTES
+        );
+    }
+
+    let patch: serde_json::Value =
+        serde_json::from_str(patch_json).context("Invalid history metadata patch JSON")?;
+    if !patch.is_object() {
+        bail!("History metadata patch must be a JSON object");
+    }
+
+    Ok(patch)
+}
 
 // Use a static Once to ensure the logger is initialized only once.
 static LOGGER_INIT: Once = Once::new();
@@ -677,6 +696,19 @@ pub async fn history() -> anyhow::Result<Vec<Movement>> {
     let mut manager = GLOBAL_WALLET_MANAGER.lock().await;
     manager
         .with_context_async(|ctx| async { ctx.wallet.history().await })
+        .await
+}
+
+pub async fn update_history_metadata(movement_id: u32, patch_json: &str) -> anyhow::Result<()> {
+    let patch = parse_history_metadata_patch(patch_json)?;
+    let mut manager = GLOBAL_WALLET_MANAGER.lock().await;
+    manager
+        .with_context_async(|ctx| async {
+            ctx.wallet
+                .update_history_metadata(MovementId::new(movement_id), &patch)
+                .await
+                .with_context(|| format!("Failed to update metadata for movement {movement_id}"))
+        })
         .await
 }
 

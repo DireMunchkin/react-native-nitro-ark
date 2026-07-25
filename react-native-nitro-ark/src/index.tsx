@@ -759,6 +759,29 @@ export function history(): Promise<BarkMovement[]> {
 }
 
 /**
+ * Applies an RFC 7396 JSON Merge Patch to a wallet movement's metadata.
+ * The patch must serialize to a JSON object no larger than 16 KiB.
+ * @param movementId The Bark movement ID.
+ * @param patchJson The JSON object merge patch.
+ * @returns A promise that resolves after Bark persists the updated metadata.
+ */
+export function updateHistoryMetadata(
+  movementId: number,
+  patchJson: string
+): Promise<void> {
+  if (
+    !Number.isFinite(movementId) ||
+    !Number.isInteger(movementId) ||
+    movementId < 0 ||
+    movementId > 0xffffffff
+  ) {
+    throw new RangeError('movementId must be a finite unsigned 32-bit integer');
+  }
+
+  return NitroArkHybridObject.updateHistoryMetadata(movementId, patchJson);
+}
+
+/**
  * Gets the list of VTXOs as a JSON string for the loaded wallet.
  * @param no_sync If true, skips synchronization with the blockchain. Defaults to false.
  * @returns A promise resolving BarkVtxo[] array.

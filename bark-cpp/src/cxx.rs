@@ -416,6 +416,7 @@ pub(crate) mod ffi {
         fn verify_message(message: &str, signature: &str, public_key: &str) -> Result<bool>;
         fn history() -> Result<Vec<BarkMovement>>;
         fn vtxos() -> Result<Vec<BarkVtxo>>;
+        fn update_history_metadata(movement_id: u32, patch_json: &str) -> Result<()>;
         fn decode_vtxo_hex(vtxo_hex: &str) -> Result<BarkVtxo>;
         fn import_vtxo(vtxo_hex: &str) -> Result<BarkVtxo>;
         fn dangerous_drop_vtxo(vtxo_id: &str) -> Result<()>;
@@ -801,6 +802,12 @@ pub(crate) fn history() -> anyhow::Result<Vec<BarkMovement>> {
         }
 
         history.iter().map(fun_name).collect()
+    })
+}
+
+pub(crate) fn update_history_metadata(movement_id: u32, patch_json: &str) -> anyhow::Result<()> {
+    ffi_boundary("update_history_metadata", || {
+        crate::TOKIO_RUNTIME.block_on(crate::update_history_metadata(movement_id, patch_json))
     })
 }
 

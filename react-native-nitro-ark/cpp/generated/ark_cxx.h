@@ -1618,6 +1618,8 @@ bool verify_message(::rust::Str message, ::rust::Str signature, ::rust::Str publ
 
 ::rust::Vec<::bark_cxx::BarkVtxo> vtxos();
 
+void update_history_metadata(::std::uint32_t movement_id, ::rust::Str patch_json);
+
 ::bark_cxx::BarkVtxo decode_vtxo_hex(::rust::Str vtxo_hex);
 
 ::bark_cxx::BarkVtxo import_vtxo(::rust::Str vtxo_hex);
