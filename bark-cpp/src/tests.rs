@@ -76,6 +76,64 @@ fn history_metadata_patch_rejects_oversized_payloads_before_wallet_access() {
     );
 }
 
+#[test]
+fn lightning_payment_origin_accepts_supported_methods() {
+    let cases = [
+        ("lightning-address", "byte@second.tech", "byte@second.tech"),
+        (
+            "lnurl",
+            "LNURL1DP68GURN8GHJ7UM9WFMXJCM99E3K7MF0V9CXJ0M385EKVCENXC6R2C35XVUKXEFCV5MKVV34X5EKZD3EV56NYD3HXQURZEPEXEJXXEPNXSCRVWFNV9NXZCN9XQ6XYEFHVGCXXCMYXYMNSERXFQ5FNS",
+            "lnurl1dp68gurn8ghj7um9wfmxjcm99e3k7mf0v9cxj0m385ekvcenxc6r2c35xvukxefcv5mkvv34x5ekzd3ev56nyd3hxqurzepexejxxepnxscrvwfnv9nxzcn9xq6xyefhvgcxxcmyxymnserxfq5fns",
+        ),
+        (
+            "custom",
+            "https://example.com/lnurlp/alice",
+            "https://example.com/lnurlp/alice",
+        ),
+    ];
+
+    for (method, value, expected_value) in cases {
+        let origin = crate::parse_lightning_payment_origin(method, value)
+            .expect("supported Lightning payment origins should be accepted");
+
+        assert_eq!(origin.type_str(), method);
+        assert_eq!(origin.value_string(), expected_value);
+    }
+}
+
+#[test]
+fn lightning_payment_origin_rejects_invalid_values() {
+    for (method, value) in [
+        ("lightning-address", "not-an-address"),
+        ("lnurl", "https://example.com/lnurlp/alice"),
+        ("custom", ""),
+        ("custom", "   "),
+    ] {
+        crate::parse_lightning_payment_origin(method, value)
+            .expect_err("invalid Lightning payment origin values should be rejected");
+    }
+}
+
+#[test]
+fn lightning_payment_origin_rejects_unsupported_methods() {
+    for method in [
+        "ark",
+        "bitcoin",
+        "output-script",
+        "invoice",
+        "offer",
+        "unknown",
+    ] {
+        let error = crate::parse_lightning_payment_origin(method, "value")
+            .expect_err("unsupported Lightning payment origin methods should be rejected");
+        assert!(
+            error
+                .to_string()
+                .contains("Unsupported Lightning payment origin method")
+        );
+    }
+}
+
 /// Creates a temporary directory and basic wallet creation options for tests.
 fn setup_test_wallet_opts() -> (tempfile::TempDir, ffi::CreateOpts) {
     let temp_dir = tempdir().expect("Failed to create temp dir");

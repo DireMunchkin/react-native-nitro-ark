@@ -184,6 +184,21 @@ export interface LightningPaymentResult {
   preimage?: string;
 }
 
+export type LightningPaymentOriginMethod =
+  | 'lightning-address'
+  | 'lnurl'
+  | 'custom';
+
+/**
+ * The original user-facing destination that was resolved to a Lightning
+ * invoice outside Bark. Only origin kinds that Bark can persist through this
+ * API are accepted; Rust validates the value again at the native boundary.
+ */
+export interface LightningPaymentOrigin {
+  method: LightningPaymentOriginMethod;
+  value: string;
+}
+
 export interface OnchainPaymentResult {
   txid: string; // Transaction ID
   amount_sat: number; // Amount in satoshis
@@ -464,6 +479,15 @@ export interface NitroArk extends HybridObject<{ ios: 'c++'; android: 'c++' }> {
     destination: string,
     wait: boolean,
     amountSat?: number
+  ): Promise<LightningPaymentResult>;
+  /**
+   * Pays an invoice already resolved by the caller while preserving the
+   * original user-facing destination in Bark's movement history.
+   */
+  payLightningInvoiceWithOrigin(
+    invoice: string,
+    origin: LightningPaymentOrigin,
+    wait: boolean
   ): Promise<LightningPaymentResult>;
   payLightningOffer(
     offer: string,

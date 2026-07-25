@@ -19,6 +19,19 @@
 namespace margelo::nitro::nitroark {
 
 using namespace margelo::nitro;
+
+inline std::string lightningPaymentOriginMethodToString(LightningPaymentOriginMethod method) {
+  switch (method) {
+    case LightningPaymentOriginMethod::LIGHTNING_ADDRESS:
+      return "lightning-address";
+    case LightningPaymentOriginMethod::LNURL:
+      return "lnurl";
+    case LightningPaymentOriginMethod::CUSTOM:
+      return "custom";
+  }
+  throw std::invalid_argument("Unsupported Lightning payment origin method");
+}
+
 // Helper functions to convert rust vtxos to C++ values
 inline BarkVtxo convertRustVtxo(const bark_cxx::BarkVtxo& vtxo_rs) {
   BarkVtxo vtxo;
@@ -1405,6 +1418,22 @@ public:
         } else {
           rust_result = bark_cxx::pay_lightning_invoice(destination, nullptr, wait);
         }
+
+        return convertRustLightningPaymentResult(rust_result);
+      } catch (const rust::Error& e) {
+        throw std::runtime_error(e.what());
+      }
+    });
+  }
+
+  // Pay an invoice resolved by the caller while preserving the durable,
+  // user-facing origin in Bark instead of storing only the one-time invoice.
+  std::shared_ptr<Promise<LightningPaymentResult>>
+  payLightningInvoiceWithOrigin(const std::string& invoice, const LightningPaymentOrigin& origin, bool wait) override {
+    return Promise<LightningPaymentResult>::async([invoice, origin, wait]() {
+      try {
+        bark_cxx::LightningPaymentResult rust_result = bark_cxx::pay_lightning_invoice_with_origin(
+            invoice, lightningPaymentOriginMethodToString(origin.method), origin.value, wait);
 
         return convertRustLightningPaymentResult(rust_result);
       } catch (const rust::Error& e) {

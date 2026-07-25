@@ -204,6 +204,16 @@ export type LightningPayment = Omit<LightningPaymentResult, 'state'> & {
   state: LightningPaymentState;
 };
 
+/**
+ * A user-facing payment identifier that has already been resolved to a
+ * Lightning invoice. `custom` preserves protocols Bark does not model
+ * natively while still recording their original identifier.
+ */
+export type LightningPaymentOrigin =
+  | { method: 'lightning-address'; value: string }
+  | { method: 'lnurl'; value: string }
+  | { method: 'custom'; value: string };
+
 export const NitroArkHybridObject =
   NitroModules.createHybridObject<NitroArk>('NitroArk');
 
@@ -1040,6 +1050,46 @@ export function payLightningInvoice(
     destination,
     wait,
     amountSat
+  ).then((result) => ({
+    ...result,
+    state: result.state as LightningPaymentState,
+  }));
+}
+
+/**
+ * Pays a Bolt11 invoice that the caller has already resolved from another
+ * user-facing payment identifier.
+ *
+ * This is a low-level counterpart to helpers such as `payLightningAddress`.
+ * It deliberately performs no remote discovery or callback request. Instead,
+ * it tells Bark which identifier produced the invoice so Bark can persist that
+ * identifier in the Lightning-send checkpoint and movement before settlement.
+ * This keeps payment provenance intact across interruption, history reloads,
+ * and wallet backups instead of recording only the one-time Bolt11 invoice.
+ *
+ * Callers remain responsible for resolving the origin, validating the returned
+ * invoice, and ensuring its amount matches the external protocol request.
+ * This API intentionally has no amount override: the resolved invoice must
+ * contain its exact payment amount.
+ *
+ * The origin becomes durable wallet history and is included in wallet
+ * database backups. Pass the original user-facing identifier, never a callback
+ * URL containing payer data, authorization tokens, or other secrets.
+ *
+ * @param invoice The already-resolved Bolt11 invoice to pay.
+ * @param origin The original destination to store in Bark's movement history.
+ * @param wait Whether to wait for the payment to complete.
+ * @returns A promise resolving to the current Lightning payment state.
+ */
+export function payLightningInvoiceWithOrigin(
+  invoice: string,
+  origin: LightningPaymentOrigin,
+  wait: boolean
+): Promise<LightningPayment> {
+  return NitroArkHybridObject.payLightningInvoiceWithOrigin(
+    invoice,
+    origin,
+    wait
   ).then((result) => ({
     ...result,
     state: result.state as LightningPaymentState,

@@ -456,6 +456,12 @@ pub(crate) mod ffi {
             amount_sat: *const u64,
             wait: bool,
         ) -> Result<LightningPaymentResult>;
+        fn pay_lightning_invoice_with_origin(
+            invoice: &str,
+            origin_method: &str,
+            origin_value: &str,
+            wait: bool,
+        ) -> Result<LightningPaymentResult>;
         unsafe fn pay_lightning_offer(
             offer: &str,
             amount_sat: *const u64,
@@ -1226,6 +1232,24 @@ pub(crate) fn pay_lightning_invoice(
 
         let send_result = crate::TOKIO_RUNTIME
             .block_on(crate::pay_lightning_invoice(invoice, amount_opt, wait))?;
+
+        Ok(lightning_payment_result_to_ffi(send_result))
+    })
+}
+
+pub(crate) fn pay_lightning_invoice_with_origin(
+    invoice: &str,
+    origin_method: &str,
+    origin_value: &str,
+    wait: bool,
+) -> anyhow::Result<ffi::LightningPaymentResult> {
+    ffi_boundary("pay_lightning_invoice_with_origin", || {
+        let origin = crate::parse_lightning_payment_origin(origin_method, origin_value)?;
+        let invoice = lightning::Invoice::from_str(invoice)?;
+
+        let send_result = crate::TOKIO_RUNTIME.block_on(
+            crate::pay_lightning_invoice_with_origin(invoice, origin, wait),
+        )?;
 
         Ok(lightning_payment_result_to_ffi(send_result))
     })
