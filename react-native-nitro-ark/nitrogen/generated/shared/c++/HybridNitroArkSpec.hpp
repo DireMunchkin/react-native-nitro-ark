@@ -69,6 +69,8 @@ namespace margelo::nitro::nitroark { struct ArkoorPaymentResult; }
 namespace margelo::nitro::nitroark { struct BarkFeeEstimate; }
 // Forward declaration of `LightningPaymentResult` to properly resolve imports.
 namespace margelo::nitro::nitroark { struct LightningPaymentResult; }
+// Forward declaration of `LightningPaymentOrigin` to properly resolve imports.
+namespace margelo::nitro::nitroark { struct LightningPaymentOrigin; }
 // Forward declaration of `Bolt11Invoice` to properly resolve imports.
 namespace margelo::nitro::nitroark { struct Bolt11Invoice; }
 // Forward declaration of `LightningReceive` to properly resolve imports.
@@ -108,6 +110,7 @@ namespace margelo::nitro::nitroark { struct LightningReceive; }
 #include "ArkoorPaymentResult.hpp"
 #include "BarkFeeEstimate.hpp"
 #include "LightningPaymentResult.hpp"
+#include "LightningPaymentOrigin.hpp"
 #include "Bolt11Invoice.hpp"
 #include "LightningReceive.hpp"
 
@@ -216,6 +219,7 @@ namespace margelo::nitro::nitroark {
       virtual std::shared_ptr<Promise<BarkFeeEstimate>> estimateBoardOffchainFee(double amountSat) = 0;
       virtual std::shared_ptr<Promise<BarkFeeEstimate>> estimateRefreshFee(const std::vector<std::string>& vtxoIds) = 0;
       virtual std::shared_ptr<Promise<LightningPaymentResult>> payLightningInvoice(const std::string& destination, bool wait, std::optional<double> amountSat) = 0;
+      virtual std::shared_ptr<Promise<LightningPaymentResult>> payLightningInvoiceWithOrigin(const std::string& invoice, const LightningPaymentOrigin& origin, bool wait) = 0;
       virtual std::shared_ptr<Promise<LightningPaymentResult>> payLightningOffer(const std::string& offer, bool wait, std::optional<double> amountSat) = 0;
       virtual std::shared_ptr<Promise<LightningPaymentResult>> payLightningAddress(const std::string& addr, double amountSat, const std::string& comment, bool wait) = 0;
       virtual std::shared_ptr<Promise<BarkFeeEstimate>> estimateLightningSendFee(double amountSat) = 0;

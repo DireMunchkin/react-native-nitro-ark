@@ -23,7 +23,7 @@ use bark::ark::lightning::{self, Preimage};
 use bark::lightning_invoice::Bolt11Invoice;
 use bark::lnurllib::lightning_address::LightningAddress;
 use bark::lock_manager::memory::MemoryLockManager;
-use bark::movement::{Movement, MovementId};
+use bark::movement::{Movement, MovementId, PaymentMethod};
 use bark::onchain::OnchainWallet;
 use bark::persist::BarkPersister;
 use bark::persist::models::{PendingBoard, RoundStateId, SettledLightningReceive};
@@ -84,6 +84,26 @@ pub(crate) fn parse_history_metadata_patch(patch_json: &str) -> anyhow::Result<s
     }
 
     Ok(patch)
+}
+
+/// Convert an app-resolved payment origin into the method Bark will persist.
+///
+/// The allowlist contains only origins that can legitimately resolve to a
+/// Lightning invoice outside Bark. Keeping it at the native boundary protects
+/// callers that bypass the public TypeScript union.
+pub(crate) fn parse_lightning_payment_origin(
+    method: &str,
+    value: &str,
+) -> anyhow::Result<PaymentMethod> {
+    if value.trim().is_empty() {
+        bail!("Lightning payment origin value must not be empty");
+    }
+
+    match method {
+        "lightning-address" | "lnurl" | "custom" => PaymentMethod::from_type_value(method, value)
+            .with_context(|| format!("Invalid Lightning payment origin '{method}'")),
+        _ => bail!("Unsupported Lightning payment origin method: {method}"),
+    }
 }
 
 // Use a static Once to ensure the logger is initialized only once.
@@ -960,6 +980,35 @@ pub async fn pay_lightning_invoice(
                 .await?;
             let payment_hash = invoice.payment_hash();
             let payment_amount = invoice.get_payment_amount(amount_sat)?;
+            let state = ctx.wallet.lightning_send_state(payment_hash).await?;
+            let mut result = lightning_payment_result_from_state(ctx, payment_hash, state).await?;
+            result.invoice.get_or_insert(invoice);
+            result.amount.get_or_insert(payment_amount);
+            Ok(result)
+        })
+        .await
+}
+
+/// Pay an invoice resolved outside Bark while preserving its original
+/// user-facing destination as the movement's payment method.
+///
+/// This records provenance only. The caller is responsible for proving that
+/// the invoice came from the supplied origin and for validating its amount.
+pub async fn pay_lightning_invoice_with_origin(
+    invoice: lightning::Invoice,
+    origin: PaymentMethod,
+    wait: bool,
+) -> anyhow::Result<LightningPaymentResult> {
+    let mut manager = GLOBAL_WALLET_MANAGER.lock().await;
+    manager
+        .with_context_async(|ctx| async {
+            let payment_hash = invoice.payment_hash();
+            let payment_amount = invoice.get_payment_amount(None)?;
+
+            ctx.wallet
+                .make_lightning_payment(&invoice, origin, None, wait)
+                .await?;
+
             let state = ctx.wallet.lightning_send_state(payment_hash).await?;
             let mut result = lightning_payment_result_from_state(ctx, payment_hash, state).await?;
             result.invoice.get_or_insert(invoice);
