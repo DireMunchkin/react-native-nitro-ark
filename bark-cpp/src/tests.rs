@@ -27,6 +27,55 @@ fn unlock_vtxos_rejects_invalid_ids_before_wallet_access() {
     );
 }
 
+#[test]
+fn history_metadata_patch_accepts_json_objects() {
+    let patch = crate::parse_history_metadata_patch(
+        r#"{"noah":{"lnurl_pay":{"payer_data":{"name":"Alice"}}}}"#,
+    )
+    .expect("object patches should be accepted");
+
+    assert_eq!(patch["noah"]["lnurl_pay"]["payer_data"]["name"], "Alice");
+}
+
+#[test]
+fn history_metadata_patch_rejects_non_objects() {
+    for patch in ["null", "[]", r#""value""#, "42", "true"] {
+        let error = crate::parse_history_metadata_patch(patch)
+            .expect_err("non-object patches should be rejected");
+        assert!(
+            error
+                .to_string()
+                .contains("History metadata patch must be a JSON object")
+        );
+    }
+}
+
+#[test]
+fn history_metadata_patch_rejects_malformed_json() {
+    let error =
+        crate::parse_history_metadata_patch("{").expect_err("malformed JSON should be rejected");
+    assert!(
+        error
+            .to_string()
+            .contains("Invalid history metadata patch JSON")
+    );
+}
+
+#[test]
+fn history_metadata_patch_rejects_oversized_payloads_before_wallet_access() {
+    let oversized = format!(
+        r#"{{"value":"{}"}}"#,
+        "x".repeat(crate::MAX_HISTORY_METADATA_PATCH_BYTES)
+    );
+    let error = cxx::update_history_metadata(1, &oversized)
+        .expect_err("oversized patches should be rejected");
+    assert!(
+        error
+            .to_string()
+            .contains("History metadata patch exceeds the 16384 byte limit")
+    );
+}
+
 /// Creates a temporary directory and basic wallet creation options for tests.
 fn setup_test_wallet_opts() -> (tempfile::TempDir, ffi::CreateOpts) {
     let temp_dir = tempdir().expect("Failed to create temp dir");
