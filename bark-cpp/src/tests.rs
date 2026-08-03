@@ -12,6 +12,26 @@ use tempfile::tempdir;
 
 // --- Test Setup ---
 
+const INVALID_MNEMONIC_SENTINEL: &str =
+    "h3-secret-sentinel invalid mnemonic words must stay private";
+
+fn assert_invalid_mnemonic_is_redacted<T>(result: anyhow::Result<T>) {
+    let error = match result {
+        Ok(_) => panic!("invalid mnemonic should be rejected"),
+        Err(error) => error,
+    };
+    let error_chain = crate::utils::format_error_chain(&error);
+
+    assert!(
+        error_chain.contains("Invalid mnemonic format"),
+        "error should explain that the mnemonic format is invalid: {error_chain}"
+    );
+    assert!(
+        !error_chain.contains(INVALID_MNEMONIC_SENTINEL),
+        "error chain must not contain the supplied mnemonic: {error_chain}"
+    );
+}
+
 #[test]
 fn bark_version_matches_resolved_build_metadata() {
     assert_eq!(crate::cxx::bark_version(), env!("BARK_WALLET_VERSION"));
@@ -208,6 +228,35 @@ fn format_error_chain_includes_causes() {
         crate::utils::format_error_chain(&error),
         "outer context\ncaused by: middle context\ncaused by: root cause"
     );
+}
+
+#[test]
+fn invalid_mnemonic_errors_do_not_include_the_supplied_value() {
+    assert_invalid_mnemonic_is_redacted(cxx::sign_messsage_with_mnemonic(
+        "message",
+        INVALID_MNEMONIC_SENTINEL,
+        "mainnet",
+        0,
+    ));
+    assert_invalid_mnemonic_is_redacted(cxx::derive_keypair_from_mnemonic(
+        INVALID_MNEMONIC_SENTINEL,
+        "mainnet",
+        0,
+    ));
+
+    let (create_dir, mut create_opts) = setup_test_wallet_opts();
+    create_opts.mnemonic = INVALID_MNEMONIC_SENTINEL.to_string();
+    assert_invalid_mnemonic_is_redacted(cxx::create_wallet(
+        create_dir.path().to_str().unwrap(),
+        create_opts,
+    ));
+
+    let (load_dir, mut load_opts) = setup_test_wallet_opts();
+    load_opts.mnemonic = INVALID_MNEMONIC_SENTINEL.to_string();
+    assert_invalid_mnemonic_is_redacted(cxx::load_wallet(
+        load_dir.path().to_str().unwrap(),
+        load_opts,
+    ));
 }
 
 /// A test fixture to ensure the wallet is loaded for a test and closed afterward.

@@ -10,7 +10,6 @@ use bark::ark::bitcoin::hex::DisplayHex;
 use bark::ark::bitcoin::{Address, address};
 use bark::ark::lightning::{self, PaymentHash};
 use bdk_wallet::bitcoin::{self, FeeRate, network};
-use bip39::Mnemonic;
 use bitcoin_ext::FeeRateExt;
 use logger::log::{self, info};
 
@@ -740,8 +739,7 @@ pub(crate) fn sign_messsage_with_mnemonic(
     index: u32,
 ) -> anyhow::Result<String> {
     ffi_boundary("sign_messsage_with_mnemonic", || {
-        let mnemonic = Mnemonic::from_str(mnemonic)
-            .with_context(|| format!("Invalid mnemonic format: '{}'", mnemonic))?;
+        let mnemonic = utils::parse_mnemonic(mnemonic)?;
 
         let network = match network {
             "mainnet" => network::Network::Bitcoin,
@@ -765,8 +763,7 @@ pub(crate) fn derive_keypair_from_mnemonic(
     index: u32,
 ) -> anyhow::Result<ffi::KeyPairResult> {
     ffi_boundary("derive_keypair_from_mnemonic", || {
-        let mnemonic = bip39::Mnemonic::from_str(mnemonic)
-            .with_context(|| format!("Invalid mnemonic format: '{}'", mnemonic))?;
+        let mnemonic = utils::parse_mnemonic(mnemonic)?;
         let network = match network {
             "mainnet" => network::Network::Bitcoin,
             "regtest" => network::Network::Regtest,
@@ -1022,8 +1019,7 @@ pub(crate) fn create_wallet(datadir: &str, opts: ffi::CreateOpts) -> anyhow::Res
 
 pub(crate) fn load_wallet(datadir: &str, config: ffi::CreateOpts) -> anyhow::Result<()> {
     ffi_boundary("load_wallet", || {
-        let mnemonic = bip39::Mnemonic::from_str(&config.mnemonic)
-            .with_context(|| format!("Invalid mnemonic format: '{}'", config.mnemonic))?;
+        let mnemonic = utils::parse_mnemonic(&config.mnemonic)?;
 
         log::info!("Loading wallet with datadir: {}", datadir);
 
